@@ -14,6 +14,8 @@ The transmitter generates a standard UART frame consisting of:
 - No parity bit
 - LSB-first data transmission
 
+A UART receiver (RX) implementation has also been added to the project along with its RTL schematic.
+
 ## UART Configuration
 
 ### RTL Default Configuration
@@ -108,6 +110,20 @@ The following schematic shows the RTL structure of the UART transmitter, includi
 
 ![UART TX Schematic](uart_tx_Schematic.png)
 
+## UART Receiver (RX)
+
+The project also includes an 8-bit UART receiver implementation.
+
+The receiver RTL is provided in:
+
+```text
+uart_rx.v
+```
+
+The corresponding RTL schematic is shown below:
+
+![UART RX Schematic](uart_rx_Schematic.png)
+
 ## Simulation
 
 The transmitter was verified using a dedicated Verilog testbench.
@@ -161,6 +177,10 @@ uart-tx-verilog/
 ├── uart_tx_tb.v
 ├── uart_tx_Schematic.png
 ├── uart_tx_tb_waveform.png
+│
+├── uart_rx.v
+├── uart_rx_Schematic.png
+│
 └── README.md
 ```
 
@@ -170,8 +190,10 @@ uart-tx-verilog/
 |---|---|
 | `uart_tx.v` | UART transmitter RTL |
 | `uart_tx_tb.v` | UART transmitter simulation testbench |
-| `uart_tx_Schematic.png` | RTL schematic |
-| `uart_tx_tb_waveform.png` | Simulation waveform |
+| `uart_tx_Schematic.png` | UART transmitter RTL schematic |
+| `uart_tx_tb_waveform.png` | UART transmitter simulation waveform |
+| `uart_rx.v` | UART receiver RTL |
+| `uart_rx_Schematic.png` | UART receiver RTL schematic |
 | `README.md` | Project documentation |
 
 ## Design Parameters
@@ -196,7 +218,7 @@ This allows the same RTL module to be adapted to different clock and baud-rate c
 
 ## Future Work
 
-- UART Receiver (RX)
+- UART Receiver (RX) verification
 - Combined UART TX/RX module
 - Loopback testing
 - FPGA hardware verification
