@@ -111,8 +111,7 @@ module uart_rx(
 
 
                 DATA: begin
-
-                    // Wait one complete bit period
+                
                     if (baud_counter == BAUD_COUNT - 1) begin
 
                         baud_counter <= 0;
