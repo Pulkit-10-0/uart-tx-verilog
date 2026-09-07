@@ -149,13 +149,16 @@ The testbench:
 - `shift_reg`
 - `baud_tick`
 
-## Simulation Waveform
+## Simulation Waveforms
 
 The simulation waveform demonstrates the complete UART transmission sequence.
 
 ![UART TX Simulation Waveform](uart_tx_tb_waveform.png)
 
-The waveform verifies:
+
+![UART RX Simulation Waveform](uart_rx_tb_waveform.png)
+
+The waveforms verifies:
 
 - Start request
 - `busy` assertion
@@ -167,6 +170,9 @@ The waveform verifies:
 - Bit counter progression
 - Stop bit
 - Return to idle
+
+
+
 
 ## Project Structure
 
