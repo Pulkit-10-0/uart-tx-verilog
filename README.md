@@ -1,69 +1,103 @@
-# UART Transmitter — Verilog
+# UART Transmitter & Receiver --- Verilog
 
-A parameterized UART transmitter designed in Verilog and verified using simulation in Xilinx Vivado.
+A parameterized UART transmitter and receiver designed in Verilog and
+verified using simulation in Xilinx Vivado.
 
 ## Overview
 
-This project implements an 8-bit UART transmitter using a finite state machine (FSM).
+This project implements an 8-bit UART communication system using Verilog
+HDL.
 
-The transmitter generates a standard UART frame consisting of:
+The project contains:
 
-- 1 start bit
-- 8 data bits
-- 1 stop bit
-- No parity bit
-- LSB-first data transmission
+-   UART Transmitter (TX)
+-   UART Receiver (RX)
+-   TX/RX loopback integration
+-   Parameterized clock and baud-rate configuration
+-   FSM-based UART transmission and reception
+-   Self-checking simulation testbenches
+-   Multi-byte loopback verification
 
-A UART receiver (RX) implementation has also been added to the project along with its RTL schematic.
+The UART uses the standard **8N1** configuration:
+
+-   1 start bit
+-   8 data bits
+-   No parity bit
+-   1 stop bit
+-   LSB-first data transmission
 
 ## UART Configuration
 
 ### RTL Default Configuration
 
-- Clock frequency: **100 MHz**
-- Baud rate: **115200**
-- Data bits: **8**
-- Start bits: **1**
-- Stop bits: **1**
-- Parity: **None**
-- Data order: **LSB first**
+-   Clock frequency: **100 MHz**
+-   Baud rate: **115200**
+-   Data bits: **8**
+-   Start bits: **1**
+-   Stop bits: **1**
+-   Parity: **None**
+-   Data order: **LSB first**
+
+The baud-rate divider is parameterized:
+
+``` verilog
+parameter CLK_FREQ = 100_000_000;
+parameter BAUD_RATE = 115200;
+
+localparam BAUD_COUNT = CLK_FREQ / BAUD_RATE;
+```
+
+This allows the same RTL to be adapted to different clock frequencies
+and baud rates.
 
 ### Testbench Configuration
 
-For faster simulation, the testbench uses:
+For faster simulation, the loopback testbench uses:
 
-- `CLK_FREQ = 100`
-- `BAUD_RATE = 10`
-- `BAUD_COUNT = 10 clock cycles per bit`
-
-Test data:
-
-```text
-10100101
+``` verilog
+.CLK_FREQ(1_000_000),
+.BAUD_RATE(100_000)
 ```
 
-Since UART transmits the least significant bit first, the data bits are transmitted in this order:
+Therefore:
 
-```text
-1 → 0 → 1 → 0 → 0 → 1 → 0 → 1
+``` text
+BAUD_COUNT = 1,000,000 / 100,000
+           = 10 clock cycles per bit
+```
+
+The testbench verifies multiple data patterns:
+
+``` text
+A5 = 1010 0101
+3C = 0011 1100
+F0 = 1111 0000
+55 = 0101 0101
 ```
 
 ## UART Frame Format
 
-```text
+The UART frame follows the standard 8N1 format:
+
+``` text
 Idle | Start | D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | Stop
   1     0     LSB                         MSB       1
 ```
 
-The TX line is normally HIGH when idle.
+The TX line is normally **HIGH** when idle.
 
-When transmission starts, the transmitter sends a LOW start bit, followed by the eight data bits, and finally a HIGH stop bit.
+When transmission starts:
 
-## FSM Architecture
+1.  A LOW start bit is transmitted.
+2.  Eight data bits are transmitted LSB first.
+3.  A HIGH stop bit is transmitted.
+4.  The transmitter returns to the idle state.
 
-The transmitter uses four states:
+## UART Transmitter (TX)
 
-```text
+The transmitter is implemented using a four-state finite state machine.
+
+``` text
         start
 IDLE ----------> START
  ^                |
@@ -77,106 +111,214 @@ IDLE ----------> START
        baud_tick
 ```
 
-### States
+### TX States
 
 #### IDLE
 
-- TX remains HIGH.
-- The transmitter waits for `start`.
-- `busy = 0`.
+-   TX remains HIGH.
+-   The transmitter waits for `start`.
+-   `busy = 0`.
 
 #### START
 
-- TX is LOW.
-- This represents the UART start bit.
-- The state lasts for one baud period.
+-   TX is LOW.
+-   This represents the UART start bit.
+-   The state lasts for one baud period.
 
 #### DATA
 
-- Eight data bits are transmitted.
-- Data is transmitted LSB first.
-- The shift register shifts right after each baud tick.
-- `bit_counter` tracks the transmitted bits.
+-   Eight data bits are transmitted.
+-   Data is transmitted LSB first.
+-   The shift register shifts right after each baud tick.
+-   `bit_counter` tracks the transmitted bits.
 
 #### STOP
 
-- TX is HIGH.
-- This represents the UART stop bit.
-- After one baud period, the transmitter returns to `IDLE`.
+-   TX is HIGH.
+-   This represents the UART stop bit.
+-   After one baud period, the transmitter returns to `IDLE`.
 
-## RTL Schematic
-
-The following schematic shows the RTL structure of the UART transmitter, including the FSM, baud-rate counter, bit counter, and shift register.
+## TX RTL Schematic
 
 ![UART TX Schematic](uart_tx_Schematic.png)
 
 ## UART Receiver (RX)
 
-The project also includes an 8-bit UART receiver implementation.
+The project also includes an 8-bit UART receiver.
+
+The receiver detects the falling edge of the start bit and then samples
+the incoming serial data at the center of each bit period.
+
+The receiver uses:
+
+-   Baud-rate counter
+-   Half-baud timing for start-bit validation
+-   Bit counter
+-   Shift register
+-   FSM
+-   `data_valid` indication
+
+The receiver verifies the start bit before entering the data reception
+state.
+
+After receiving eight data bits, the receiver checks the stop bit. If
+the stop bit is HIGH, the received byte is transferred to `data_out` and
+`data_valid` is asserted.
 
 The receiver RTL is provided in:
 
-```text
+``` text
 uart_rx.v
 ```
 
-The corresponding RTL schematic is shown below:
+### RX RTL Schematic
 
 ![UART RX Schematic](uart_rx_Schematic.png)
 
-## Simulation
+## UART TX/RX Loopback
 
-The transmitter was verified using a dedicated Verilog testbench.
+A loopback module was added to connect the UART transmitter directly to
+the UART receiver.
 
-The testbench:
+The architecture is:
 
-1. Applies reset.
-2. Loads the test byte `10100101`.
-3. Generates a `start` pulse.
-4. Allows the UART transmitter to serialize the byte.
-5. Observes the TX waveform and internal signals.
+``` text
+        ┌─────────────┐
+        │ UART TX     │
+        │             │
+data_in ─►             │
+        │             │
+        └──────┬──────┘
+               │
+               │ serial_line
+               │
+        ┌──────▼──────┐
+        │ UART RX     │
+        │             │
+        │             ├──► data_out
+        │             │
+        └─────────────┘
+```
 
-### Signals Observed
+The loopback module provides:
 
-- `clk`
-- `reset`
-- `start`
-- `data_in`
-- `tx`
-- `busy`
-- `baud_counter`
-- `bit_counter`
-- `shift_reg`
-- `baud_tick`
+-   TX output
+-   TX busy status
+-   RX busy status
+-   RX data output
+-   RX `data_valid` signal
 
-## Simulation Waveforms
+The TX and RX modules share the same clock-frequency and baud-rate
+parameters.
 
-The simulation waveform demonstrates the complete UART transmission sequence.
+## Simulation and Verification
 
-![UART TX Simulation Waveform](uart_tx_tb_waveform.png)
+The UART system was verified using Verilog testbenches in Vivado
+Simulator.
 
+The loopback testbench uses a reusable Verilog task:
 
-![UART RX Simulation Waveform](uart_rx_tb_waveform.png)
+``` verilog
+task send_byte(input [7:0] expected_data);
+```
 
-The waveforms verifies:
+The task automates the complete test sequence:
 
-- Start request
-- `busy` assertion
-- Start bit
-- Eight data bits
-- LSB-first transmission
-- Baud tick generation
-- Shift-register operation
-- Bit counter progression
-- Stop bit
-- Return to idle
+1.  Wait until the transmitter is idle.
+2.  Load the test byte into `data_in`.
+3.  Generate the `start` pulse.
+4.  Wait for the receiver to assert `data_valid`.
+5.  Compare the received byte with the expected byte.
+6.  Display a PASS or FAIL result.
 
+The testbench uses:
 
+``` verilog
+wait(tx_busy == 0);
+```
 
+to ensure that a new byte is not started while the transmitter is still
+busy.
+
+It then waits for:
+
+``` verilog
+wait(data_valid == 1);
+```
+
+before checking the received data.
+
+## Loopback Verification Results
+
+The following byte patterns were tested:
+
+``` text
+A5
+3C
+F0
+55
+```
+
+The Vivado simulation produced:
+
+``` text
+PASS: Expected = a5, Received = a5
+PASS: Expected = 3c, Received = 3c
+PASS: Expected = f0, Received = f0
+PASS: Expected = 55, Received = 55
+```
+
+This verifies that the transmitted data successfully travels through the
+loopback path:
+
+``` text
+TX → serial_line → RX → data_out
+```
+
+## Loopback Simulation Waveform
+
+The waveform below shows the multi-byte TX/RX loopback simulation.
+
+![UART TX/RX Loopback Waveform](uart_loopback_tb.png)
+
+The waveform demonstrates:
+
+-   Multiple transmitted bytes
+-   `data_in` changing between test bytes
+-   TX activity on the serial line
+-   `tx_busy` assertion during transmission
+-   RX activity
+-   `data_out` receiving the transmitted bytes
+-   `data_valid` assertion after successful reception
+
+The tested sequence is:
+
+``` text
+A5 → 3C → F0 → 55
+```
+
+with the received data following the same sequence.
+
+## Signals Observed
+
+The simulation includes the following signals:
+
+-   `clk`
+-   `reset`
+-   `start`
+-   `data_in`
+-   `data_out`
+-   `data_valid`
+-   `tx`
+-   `tx_busy`
+-   `rx_busy`
+
+Internal UART signals such as the baud-rate counter, bit counter, shift
+register, and FSM state can also be inspected during simulation.
 
 ## Project Structure
 
-```text
+``` text
 uart-tx-verilog/
 │
 ├── uart_tx.v
@@ -186,46 +328,57 @@ uart-tx-verilog/
 │
 ├── uart_rx.v
 ├── uart_rx_Schematic.png
+├── uart_rx_tb_waveform.png
+│
+├── uart_loopback.v
+├── uart_loopback_tb.v
+├── uart_loopback_tb.png
 │
 └── README.md
 ```
 
 ### File Description
 
-| File | Description |
-|---|---|
-| `uart_tx.v` | UART transmitter RTL |
-| `uart_tx_tb.v` | UART transmitter simulation testbench |
-| `uart_tx_Schematic.png` | UART transmitter RTL schematic |
-| `uart_tx_tb_waveform.png` | UART transmitter simulation waveform |
-| `uart_rx.v` | UART receiver RTL |
-| `uart_rx_Schematic.png` | UART receiver RTL schematic |
-| `README.md` | Project documentation |
+  File                        Description
+  --------------------------- ----------------------------------------
+  `uart_tx.v`                 UART transmitter RTL
+  `uart_tx_tb.v`              UART transmitter simulation testbench
+  `uart_tx_Schematic.png`     UART transmitter RTL schematic
+  `uart_tx_tb_waveform.png`   UART transmitter simulation waveform
+  `uart_rx.v`                 UART receiver RTL
+  `uart_rx_Schematic.png`     UART receiver RTL schematic
+  `uart_rx_tb_waveform.png`   UART receiver simulation waveform
+  `uart_loopback.v`           TX/RX loopback integration module
+  `uart_loopback_tb.v`        Self-checking TX/RX loopback testbench
+  `uart_loopback_tb.png`      TX/RX loopback simulation waveform
+  `README.md`                 Project documentation
 
 ## Design Parameters
 
-The UART transmitter is parameterized so the clock frequency and baud rate can be changed:
+Both UART TX and RX are parameterized using clock frequency and baud
+rate:
 
-```verilog
+``` verilog
 parameter CLK_FREQ = 100_000_000;
 parameter BAUD_RATE = 115200;
 
 localparam BAUD_COUNT = CLK_FREQ / BAUD_RATE;
 ```
 
-This allows the same RTL module to be adapted to different clock and baud-rate configurations.
+This allows the UART modules to be reused with different system clock
+and baud-rate configurations.
 
 ## Tools Used
 
-- **Verilog HDL**
-- **Xilinx Vivado**
-- **Vivado Simulator**
-- **Git / GitHub**
+-   **Verilog HDL**
+-   **Xilinx Vivado 2025.2**
+-   **Vivado Simulator**
+-   **Git / GitHub**
 
 ## Future Work
 
-- UART Receiver (RX) verification
-- Combined UART TX/RX module
-- Loopback testing
-- FPGA hardware verification
-- Improved baud-rate generation with fractional error correction
+-   Test reset during an active transmission
+-   Test `start` requests while TX is busy
+-   Add additional edge-case and randomized verification
+-   Improve baud-rate generation with fractional error correction
+-   FPGA hardware verification
